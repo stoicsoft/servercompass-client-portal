@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim
+FROM node:26-bookworm-slim
 WORKDIR /app
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /root/.npm
 COPY client-portal-runtime/gateway ./gateway

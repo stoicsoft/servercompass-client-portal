@@ -87,8 +87,8 @@ Pushing a `v*` tag runs tests, builds `linux/amd64` and `linux/arm64` images, ge
 Published image names:
 
 ```text
-ghcr.io/stoicsoft/servercompass-client-portal-gateway
-ghcr.io/stoicsoft/servercompass-client-portal-broker
+ghcr.io/stoicsoft/servercompass-client-portal/gateway
+ghcr.io/stoicsoft/servercompass-client-portal/broker
 ```
 
 Do not configure Server Compass with a mutable tag. Copy the manifest digests from a successful release workflow and use `image@sha256:...` references. An image from a failed security workflow is not an accepted release.
@@ -104,4 +104,3 @@ The broker's Docker socket access is a privileged boundary. Public routes must n
 Copyright © StoicSoft contributors.
 
 Licensed under the [GNU Affero General Public License v3.0](LICENSE), SPDX identifier `AGPL-3.0-only`.
-

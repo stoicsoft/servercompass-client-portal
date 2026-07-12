@@ -15,6 +15,8 @@ assert.match(manifest.releaseUrl, /^https:\/\/github\.com\/stoicsoft\/servercomp
 assert.equal(manifest.sourceUrl, 'https://github.com/stoicsoft/servercompass-client-portal');
 assert.match(manifest.images.gateway, pinnedImage);
 assert.match(manifest.images.broker, pinnedImage);
+assert.match(manifest.images.gateway, /^ghcr\.io\/stoicsoft\/servercompass-client-portal\/gateway@/);
+assert.match(manifest.images.broker, /^ghcr\.io\/stoicsoft\/servercompass-client-portal\/broker@/);
 assert.equal(typeof manifest.capabilities.restart, 'boolean');
 assert.equal(typeof manifest.capabilities.lifecycle, 'boolean');
 assert.equal(typeof manifest.capabilities.logs, 'boolean');

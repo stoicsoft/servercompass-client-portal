@@ -84,6 +84,8 @@ docker build \
 
 Pushing a `v*` tag runs tests, builds `linux/amd64` and `linux/arm64` images, generates SBOM/provenance, scans HIGH and CRITICAL vulnerabilities, and keylessly signs each accepted immutable digest.
 
+Server Compass reads [`runtime-release.json`](runtime-release.json) as the public stable-channel manifest. It validates the schema, protocol version, and digest-pinned image references before offering installation. The file contains no credentials or deployment secrets.
+
 Published image names:
 
 ```text

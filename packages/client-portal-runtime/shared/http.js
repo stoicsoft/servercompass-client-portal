@@ -31,6 +31,25 @@ export function safeEqual(left, right) {
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
+export function resolveClientAddress(forwardedFor, peerAddress, trustedHops = 1) {
+  const peer = typeof peerAddress === 'string' && peerAddress.trim() ? peerAddress.trim() : 'unknown';
+  const hops = Number.isInteger(trustedHops) && trustedHops >= 0 ? trustedHops : 1;
+  // hops === 0 means no proxy is trusted to set X-Forwarded-For, so only the
+  // real TCP peer is authoritative.
+  if (hops === 0) return peer;
+  const entries = String(forwardedFor ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  // Standard "trust proxy = N" semantics: the client address is the entry the
+  // outermost trusted proxy inserted (the hops-th value from the right).
+  // Anything further left is caller-supplied and must never be trusted. A chain
+  // shorter than the trusted hop count means the request arrived from closer
+  // than the deployment expects, so fall back to the authoritative TCP peer.
+  const index = entries.length - hops;
+  return index >= 0 ? entries[index] : peer;
+}
+
 export function cookies(request) {
   const result = Object.create(null);
   const header = String(request.headers.cookie ?? '').slice(0, 8 * 1024);

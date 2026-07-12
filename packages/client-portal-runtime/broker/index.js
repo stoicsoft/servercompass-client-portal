@@ -13,7 +13,7 @@ import {
   startStack,
   suspendStack,
 } from './docker.js';
-import { cookies, json, readJson, safeEqual } from '../shared/http.js';
+import { cookies, json, readJson, resolveClientAddress, safeEqual } from '../shared/http.js';
 
 const port = Number(process.env.PORT ?? 4101);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be a valid TCP port');
@@ -30,6 +30,10 @@ const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const sourceDigest = (value) => createHmac('sha256', sessionSecret).update(value).digest('hex');
 const sessionSignature = (sessionId) => createHmac('sha256', sessionSecret).update(sessionId).digest('hex');
 const genericAuthError = (response) => json(response, 401, { error: 'Link invalid or unavailable' });
+// The broker only accepts traffic from the gateway (one trusted hop), which
+// forwards the resolved client address as a single X-Forwarded-For value.
+const GATEWAY_TRUSTED_HOPS = 1;
+const clientAddress = (request) => resolveClientAddress(request?.headers['x-forwarded-for'], request?.socket?.remoteAddress, GATEWAY_TRUSTED_HOPS);
 
 async function collectStack(stackRef, expectedProjectName) {
   const attemptedAt = Date.now();
@@ -97,7 +101,7 @@ collector.unref();
 void runCollector().catch(() => { /* per-stack cache records the failure */ });
 
 function audit(linkId, eventType, outcome, detail = {}, request) {
-  const source = String(request?.headers['x-forwarded-for'] ?? request?.socket.remoteAddress ?? '').split(',')[0].trim();
+  const source = request ? clientAddress(request) : '';
   db.prepare(`INSERT INTO audit_events (id, link_id, event_type, outcome, detail_json, source_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
     .run(randomUUID(), linkId ?? null, eventType, outcome, JSON.stringify(detail), source ? sourceDigest(source) : null, Date.now());
 }
@@ -205,7 +209,7 @@ async function runStackAction(request, response, auth, action) {
     }
     return json(response, 409, { error: `This ${action} request is already running`, operationId: idempotencyKey });
   }
-  const sourceKey = sourceDigest(String(request.headers['x-forwarded-for'] ?? request.socket.remoteAddress ?? 'unknown').split(',')[0].trim());
+  const sourceKey = sourceDigest(clientAddress(request));
   if (rateLimit(`${action}-link:${auth.link.id}`, 1, 60_000) || rateLimit(`${action}-source:${sourceKey}`, 5, 60_000)) {
     return json(response, 429, { error: 'Try again later' }, { 'retry-after': '60' });
   }
@@ -354,7 +358,7 @@ async function publicApi(request, response, url) {
   if (!safeEqual(request.headers['x-portal-gateway-token'] ?? '', gatewayToken)) return genericAuthError(response);
   if (request.headers['x-portal-origin-valid'] !== '1') return json(response, 403, { error: 'Invalid request origin' });
   if (url.pathname === '/api/session/exchange' && request.method === 'POST') {
-    const source = sourceDigest(String(request.headers['x-forwarded-for'] ?? request.socket.remoteAddress ?? 'unknown'));
+    const source = sourceDigest(clientAddress(request));
     if (rateLimit(`exchange:${source}`, 10, 60_000)) return json(response, 429, { error: 'Try again later' }, { 'retry-after': '60' });
     const body = await readJson(request);
     const link = typeof body.capability === 'string' ? activeLinkByCapability(body.capability) : null;

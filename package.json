@@ -11,7 +11,9 @@
   "scripts": {
     "install:runtime": "npm ci --prefix packages/client-portal-runtime",
     "test": "npm run test:manifest && npm --prefix packages/client-portal-runtime test",
-    "test:manifest": "node scripts/validate-runtime-release.mjs"
+    "test:manifest": "node scripts/validate-runtime-release.mjs",
+    "manifest:keygen": "node scripts/generate-manifest-keypair.mjs",
+    "manifest:sign": "node scripts/sign-runtime-release.mjs"
   },
   "repository": {
     "type": "git",

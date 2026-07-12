@@ -1,0 +1,14 @@
+{
+  "name": "@servercompass/client-portal-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@servercompass/client-portal-protocol": "file:../client-portal-protocol",
+    "better-sqlite3": "^12.4.1"
+  }
+}

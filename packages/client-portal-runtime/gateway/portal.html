@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Application status</title>
+  <link rel="stylesheet" href="/portal.css">
+</head>
+<body>
+  <main class="shell">
+    <section id="auth" hidden aria-labelledby="auth-title"><div class="lock" aria-hidden="true">◈</div><h1 id="auth-title">Application status</h1><p id="auth-copy">Use the private link shared by the application owner.</p><p id="auth-message" role="alert"></p><div id="passcode-wrap" hidden><label for="passcode">Passcode</label><input id="passcode" type="password" autocomplete="current-password"><button id="passcode-submit" class="primary" type="button">Continue</button></div></section>
+    <section id="dashboard" hidden>
+      <header><div><p class="eyebrow">CLIENT PORTAL</p><h1 class="title" id="client-label">Application</h1></div><button id="refresh" type="button">Refresh</button></header>
+      <div class="bar"><p id="message" role="status" aria-live="polite">Connecting…</p><span class="subtle" id="updated"></span></div>
+      <div class="grid">
+        <article class="card"><h2>Overall status</h2><p class="value" id="health">—</p></article>
+        <article class="card"><h2>Uptime</h2><p class="value" id="uptime">—</p><p class="metric-note" id="containers">—</p></article>
+        <article class="card"><h2>CPU</h2><p class="value" id="cpu">—</p></article>
+        <article class="card"><h2>Memory</h2><p class="value" id="memory">—</p></article>
+        <article class="card wide"><h2>Network</h2><p class="value" id="network-rate">—</p><p class="metric-note" id="network-total">—</p></article>
+        <article class="card wide"><h2>Container storage</h2><p class="value" id="storage">—</p><p class="metric-note" id="storage-io">Named-volume capacity is not included.</p></article>
+        <article class="card wide"><h2>Services</h2><ul id="services" class="services"></ul></article>
+        <article class="card wide" id="backup-card"><h2>Backups</h2><p class="value value-small" id="backup-status">Owner-managed</p><p class="metric-note" id="backup-reason">Backup status is controlled by the application owner.</p></article>
+        <article class="card full" id="http-metrics-unavailable"><h2>HTTP traffic</h2><p class="subtle" id="http-metrics-reason">HTTP request metrics are unavailable. Resource metrics continue to update.</p></article>
+        <article class="card full"><h2>Last hour</h2><div class="legend"><span><i class="cpu-key"></i>CPU</span><span><i class="memory-key"></i>Memory</span></div><svg id="history-chart" class="chart" viewBox="0 0 600 180" role="img" aria-label="CPU and memory percentage over the last hour"><polyline id="cpu-line" class="cpu-line" points=""></polyline><polyline id="memory-line" class="memory-line" points=""></polyline></svg><div class="table-wrap"><table><caption>Recent metric samples</caption><thead><tr><th>Time</th><th>CPU</th><th>Memory</th><th>Network</th><th>Storage</th><th>Components</th></tr></thead><tbody id="history-rows"></tbody></table></div></article>
+        <article class="card full" id="actions-card"><h2>Owner-enabled actions</h2><p class="subtle">Actions apply to the whole application and are recorded for the owner.</p><div class="actions"><button class="primary" id="start" type="button" hidden>Start application</button><button id="restart" type="button" hidden>Restart application</button><button class="danger" id="suspend" type="button" hidden>Suspend application</button></div></article>
+        <article class="card full" id="logs-card" hidden><h2>Recent application logs</h2><button id="show-logs" type="button">Load recent logs</button><pre id="logs" class="logs" aria-live="polite">Logs are loaded only when requested.</pre></article>
+      </div>
+      <p class="foot">Access is read-only unless the owner explicitly enables an action.</p>
+    </section>
+  </main>
+  <script src="/portal.js" defer></script>
+</body>
+</html>

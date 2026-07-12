@@ -4,7 +4,7 @@ import { PROTOCOL_VERSION, SCHEMA_VERSION, validateLinkPolicy } from '../../clie
 import { openBrokerDatabase } from '../broker/schema.js';
 import { addCounterRates, orderedPowerContainers, redactLogText, scopedContainers } from '../broker/docker.js';
 import { Readable } from 'node:stream';
-import { cookies, readJson, MAX_BODY_BYTES } from '../shared/http.js';
+import { cookies, readJson, resolveClientAddress, MAX_BODY_BYTES } from '../shared/http.js';
 import { validateBrowserRequest } from '../gateway/security.js';
 
 test('protocol rejects unknown permissions and accepts the scoped baseline', () => {
@@ -80,6 +80,27 @@ test('gateway enforces configured Host and same-origin mutations while allowing 
   assert.equal(validateBrowserRequest({ host: 'clients.example.com', method: 'POST' }, publicOrigin).valid, false);
 });
 
+test('gateway serves multiple configured hostnames, each scoped to its own origin', () => {
+  const origins = ['https://portal.domain1.com', 'https://portal.domain2.com'];
+  // Each configured hostname is accepted and reports its own origin back for CSRF.
+  const first = validateBrowserRequest({ host: 'portal.domain1.com', origin: 'https://portal.domain1.com', method: 'POST' }, origins);
+  assert.equal(first.valid, true);
+  assert.equal(first.requestOrigin, 'https://portal.domain1.com');
+  const second = validateBrowserRequest({ host: 'portal.domain2.com', origin: 'https://portal.domain2.com', method: 'POST' }, origins);
+  assert.equal(second.valid, true);
+  assert.equal(second.requestOrigin, 'https://portal.domain2.com');
+  // A GET with no Origin is allowed for any configured host.
+  assert.equal(validateBrowserRequest({ host: 'portal.domain2.com', method: 'GET' }, origins).valid, true);
+  // Cross-origin between two configured hosts is still rejected (Origin must match the Host).
+  assert.equal(validateBrowserRequest({ host: 'portal.domain1.com', origin: 'https://portal.domain2.com', method: 'POST' }, origins).valid, false);
+  // A hostname that is not configured is rejected even though others are valid.
+  assert.equal(validateBrowserRequest({ host: 'portal.domain3.com', origin: 'https://portal.domain3.com', method: 'POST' }, origins).valid, false);
+  // Loopback preview keeps working alongside multiple public origins.
+  assert.equal(validateBrowserRequest({ host: 'localhost:41800', origin: 'http://localhost:41800', method: 'POST' }, origins).valid, true);
+  // Malformed configuration (a non-HTTPS entry) fails closed.
+  assert.equal(validateBrowserRequest({ host: 'portal.domain1.com', method: 'GET' }, ['https://portal.domain1.com', 'http://insecure.example']).valid, false);
+});
+
 test('log redaction removes known secrets, token patterns, ANSI, control bytes, and oversized lines', () => {
   const secret = 'super-secret-value';
   const output = redactLogText(`\u001b[31merror\u001b[0m\nTOKEN=abc123\npassword: hunter2\npostgres://admin:db-password@example.test/app\n${secret}\u0000\n${'x'.repeat(5000)}`, [secret]);
@@ -90,4 +111,24 @@ test('log redaction removes known secrets, token patterns, ANSI, control bytes, 
   assert.equal(output.includes('\u001b'), false);
   assert.equal(output.includes('\u0000'), false);
   assert.equal(output.split('\n').at(-1).length, 4096);
+});
+
+test('client address trusts exactly the configured proxy hop and rejects spoofed X-Forwarded-For', () => {
+  // One trusted proxy: the client address is the single value the proxy set,
+  // regardless of any client-supplied entries to the left of it.
+  assert.equal(resolveClientAddress('203.0.113.7', '10.0.0.2', 1), '203.0.113.7');
+  assert.equal(resolveClientAddress('9.9.9.9, 203.0.113.7', '10.0.0.2', 1), '203.0.113.7');
+  assert.equal(resolveClientAddress('spoof, spoof2, 203.0.113.7', '10.0.0.2', 1), '203.0.113.7');
+  // Two trusted proxies: take the second value from the right.
+  assert.equal(resolveClientAddress('spoof, 203.0.113.7, 10.0.0.9', '10.0.0.2', 2), '203.0.113.7');
+  // No X-Forwarded-For, or zero trusted hops, falls back to the real TCP peer.
+  assert.equal(resolveClientAddress(undefined, '10.0.0.2', 1), '10.0.0.2');
+  assert.equal(resolveClientAddress('', '10.0.0.2', 1), '10.0.0.2');
+  assert.equal(resolveClientAddress('203.0.113.7', '10.0.0.2', 0), '10.0.0.2');
+  // A chain shorter than the trusted hop count is suspicious; fall back to the peer.
+  assert.equal(resolveClientAddress('203.0.113.7', '10.0.0.2', 3), '10.0.0.2');
+  // Missing peer and empty chain degrade to a stable sentinel, never a throw.
+  assert.equal(resolveClientAddress(undefined, undefined, 1), 'unknown');
+  // Non-integer / negative hop counts are treated as the safe default of 1.
+  assert.equal(resolveClientAddress('9.9.9.9, 203.0.113.7', '10.0.0.2', -4), '203.0.113.7');
 });

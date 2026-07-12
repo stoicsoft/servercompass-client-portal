@@ -12,27 +12,42 @@ function hostUrl(rawHost) {
   }
 }
 
-export function validateBrowserRequest({ host, origin, method }, publicOrigin) {
-  let configured;
-  try {
-    configured = new URL(publicOrigin);
-  } catch {
-    return { valid: false, reason: 'invalid_configuration' };
+export function parsePublicOrigins(publicOrigins) {
+  const raw = Array.isArray(publicOrigins) ? publicOrigins : [publicOrigins];
+  const configured = [];
+  const seen = new Set();
+  for (const value of raw) {
+    if (typeof value !== 'string' || !value.trim()) continue;
+    let url;
+    try {
+      url = new URL(value.trim());
+    } catch {
+      return null;
+    }
+    if (url.protocol !== 'https:' || url.pathname !== '/' || url.search || url.hash || url.port) return null;
+    const hostname = url.hostname.toLowerCase();
+    if (seen.has(hostname)) continue;
+    seen.add(hostname);
+    configured.push(url);
   }
-  if (configured.protocol !== 'https:' || configured.pathname !== '/' || configured.search || configured.hash) {
-    return { valid: false, reason: 'invalid_configuration' };
-  }
+  return configured.length ? configured : null;
+}
+
+export function validateBrowserRequest({ host, origin, method }, publicOrigins) {
+  const configured = parsePublicOrigins(publicOrigins);
+  if (!configured) return { valid: false, reason: 'invalid_configuration' };
 
   const requestedHost = hostUrl(host);
   if (!requestedHost) return { valid: false, reason: 'invalid_host' };
   const hostname = requestedHost.hostname.toLowerCase();
   const loopback = LOOPBACK_HOSTS.has(hostname);
-  const publicHost = hostname === configured.hostname.toLowerCase()
-    && (!requestedHost.port || requestedHost.port === '443');
-  if (!loopback && !publicHost) return { valid: false, reason: 'invalid_host' };
+  const matched = requestedHost.port && requestedHost.port !== '443'
+    ? undefined
+    : configured.find((url) => url.hostname.toLowerCase() === hostname);
+  if (!loopback && !matched) return { valid: false, reason: 'invalid_host' };
 
-  const requestOrigin = publicHost
-    ? configured.origin
+  const requestOrigin = matched
+    ? matched.origin
     : `http://${host}`;
   let normalizedOrigin = null;
   if (origin) {

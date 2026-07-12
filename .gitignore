@@ -3,4 +3,8 @@ coverage/
 .env
 .DS_Store
 *.log
+# Manifest signing private keys must never be committed (see SECURITY.md).
+*.pem
+manifest-signing-key*
+
 

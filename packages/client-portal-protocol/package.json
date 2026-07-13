@@ -1,6 +1,6 @@
 {
   "name": "@servercompass/client-portal-protocol",
-  "version": "0.1.1",
+  "version": "0.2.1",
   "description": "Versioned policy contract for Server Compass Client Portal",
   "license": "AGPL-3.0-only",
   "type": "module",

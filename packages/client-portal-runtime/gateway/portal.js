@@ -115,6 +115,13 @@ async function refresh() {
   finally { state.refreshing = false; }
 }
 
+async function activateSession(result) {
+  state.csrf = result.csrf;
+  await refresh();
+  if (state.timer) window.clearInterval(state.timer);
+  state.timer = window.setInterval(refresh, 30_000);
+}
+
 async function attemptExchange(passcode = '') {
   if (!state.capability && !state.previewGrant) return;
   const previewing = Boolean(state.previewGrant);
@@ -124,10 +131,7 @@ async function attemptExchange(passcode = '') {
       : await request('/api/session/exchange', { method: 'POST', body: JSON.stringify({ capability: state.capability, passcode }) });
     state.capability = '';
     state.previewGrant = '';
-    state.csrf = result.csrf;
-    await refresh();
-    if (state.timer) window.clearInterval(state.timer);
-    state.timer = window.setInterval(refresh, 30_000);
+    await activateSession(result);
   } catch {
     $('#auth').hidden = false;
     if (previewing) {
@@ -140,6 +144,16 @@ async function attemptExchange(passcode = '') {
   }
 }
 
+async function attemptRestore() {
+  try {
+    const result = await request('/api/session/restore', { method: 'POST', body: '{}' });
+    await activateSession(result);
+  } catch {
+    $('#auth').hidden = false;
+    setAuthMessage('This link is invalid or unavailable.');
+  }
+}
+
 async function exchange() {
   const rawFragment = location.hash.slice(1);
   const params = new URLSearchParams(rawFragment);
@@ -147,8 +161,7 @@ async function exchange() {
   state.previewGrant = params.get('preview') || '';
   history.replaceState(null, '', `${location.pathname}${location.search}`);
   if (!state.capability && !state.previewGrant) {
-    $('#auth').hidden = false;
-    setAuthMessage('This link is invalid or unavailable.');
+    await attemptRestore();
     return;
   }
   await attemptExchange();

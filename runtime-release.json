@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "channel": "stable",
-  "version": "0.1.1",
+  "version": "0.3.0",
   "protocolVersion": 3,
-  "publishedAt": "2026-07-12T09:03:32Z",
-  "releaseUrl": "https://github.com/stoicsoft/servercompass-client-portal/releases/tag/v0.1.1",
+  "publishedAt": "2026-07-13T08:24:22Z",
+  "releaseUrl": "https://github.com/stoicsoft/servercompass-client-portal/releases/tag/v0.3.0",
   "sourceUrl": "https://github.com/stoicsoft/servercompass-client-portal",
   "images": {
-    "gateway": "ghcr.io/stoicsoft/servercompass-client-portal/gateway@sha256:549ebf5c2e318406c4cfd402542281b2f0943b7a7c6fda8e780fe8fd4ebada6e",
-    "broker": "ghcr.io/stoicsoft/servercompass-client-portal/broker@sha256:220a4bf617da772dde0dc0457d69b353e701c94b7c5ab43b1e8d77d81ce3571b"
+    "gateway": "ghcr.io/stoicsoft/servercompass-client-portal/gateway@sha256:a318a73729ce97750aa91bb5969fdd69f7ea6b25da657c21e00e36718f2d6302",
+    "broker": "ghcr.io/stoicsoft/servercompass-client-portal/broker@sha256:a2bc7278484f20435cc25bf30959b079be24975ee785ac9ddccf6d2f617bc184"
   },
   "capabilities": {
     "restart": true,

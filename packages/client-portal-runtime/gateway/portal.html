@@ -8,25 +8,94 @@
 </head>
 <body>
   <main class="shell">
-    <section id="auth" hidden aria-labelledby="auth-title"><div class="lock" aria-hidden="true">◈</div><h1 id="auth-title">Application status</h1><p id="auth-copy">Use the private link shared by the application owner.</p><p id="auth-message" role="alert"></p><div id="passcode-wrap" hidden><label for="passcode">Passcode</label><input id="passcode" type="password" autocomplete="current-password"><button id="passcode-submit" class="primary" type="button">Continue</button></div></section>
-    <section id="dashboard" hidden>
-      <header><div><p class="eyebrow">CLIENT PORTAL</p><h1 class="title" id="client-label">Application</h1></div><button id="refresh" type="button">Refresh</button></header>
-      <div class="bar"><p id="message" role="status" aria-live="polite">Connecting…</p><span class="subtle" id="updated"></span></div>
-      <div class="grid">
-        <article class="card"><h2>Overall status</h2><p class="value" id="health">—</p></article>
-        <article class="card"><h2>Uptime</h2><p class="value" id="uptime">—</p><p class="metric-note" id="containers">—</p></article>
-        <article class="card"><h2>CPU</h2><p class="value" id="cpu">—</p></article>
-        <article class="card"><h2>Memory</h2><p class="value" id="memory">—</p></article>
-        <article class="card wide"><h2>Network</h2><p class="value" id="network-rate">—</p><p class="metric-note" id="network-total">—</p></article>
-        <article class="card wide"><h2>Container storage</h2><p class="value" id="storage">—</p><p class="metric-note" id="storage-io">Named-volume capacity is not included.</p></article>
-        <article class="card wide"><h2>Services</h2><ul id="services" class="services"></ul></article>
-        <article class="card wide" id="backup-card"><h2>Backups</h2><p class="value value-small" id="backup-status">Owner-managed</p><p class="metric-note" id="backup-reason">Backup status is controlled by the application owner.</p></article>
-        <article class="card full" id="http-metrics-unavailable"><h2>HTTP traffic</h2><p class="subtle" id="http-metrics-reason">HTTP request metrics are unavailable. Resource metrics continue to update.</p></article>
-        <article class="card full"><h2>Last hour</h2><div class="legend"><span><i class="cpu-key"></i>CPU</span><span><i class="memory-key"></i>Memory</span></div><svg id="history-chart" class="chart" viewBox="0 0 600 180" role="img" aria-label="CPU and memory percentage over the last hour"><polyline id="cpu-line" class="cpu-line" points=""></polyline><polyline id="memory-line" class="memory-line" points=""></polyline></svg><div class="table-wrap"><table><caption>Recent metric samples</caption><thead><tr><th>Time</th><th>CPU</th><th>Memory</th><th>Network</th><th>Storage</th><th>Components</th></tr></thead><tbody id="history-rows"></tbody></table></div></article>
-        <article class="card full" id="actions-card"><h2>Owner-enabled actions</h2><p class="subtle">Actions apply to the whole application and are recorded for the owner.</p><div class="actions"><button class="primary" id="start" type="button" hidden>Start application</button><button id="restart" type="button" hidden>Restart application</button><button class="danger" id="suspend" type="button" hidden>Suspend application</button></div></article>
-        <article class="card full" id="logs-card" hidden><h2>Recent application logs</h2><button id="show-logs" type="button">Load recent logs</button><pre id="logs" class="logs" aria-live="polite">Logs are loaded only when requested.</pre></article>
+    <section id="loading" class="auth-card" aria-live="polite">
+      <div class="brand-mark brand-mark-large" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2L12 3Z"/><path d="m8.2 12 2.3 2.3 5.3-5.3"/></svg>
       </div>
-      <p class="foot">Access is read-only unless the owner explicitly enables an action.</p>
+      <h1>Connecting securely</h1>
+      <p>Checking this browser for client portal access…</p>
+      <div class="loading-line" aria-hidden="true"><span></span></div>
+    </section>
+
+    <section id="auth" class="auth-card" hidden aria-labelledby="auth-title">
+      <div class="brand-mark brand-mark-large" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2L12 3Z"/><path d="M9 12h6M12 9v6"/></svg>
+      </div>
+      <p class="eyebrow">SECURE CLIENT PORTAL</p>
+      <h1 id="auth-title">Application status</h1>
+      <p id="auth-copy">Open the private link shared by the application owner. Returning clients are remembered securely on this device.</p>
+      <p id="auth-message" class="auth-message" role="alert"></p>
+      <div id="passcode-wrap" hidden>
+        <label for="passcode">Passcode</label>
+        <input id="passcode" type="password" autocomplete="current-password">
+        <button id="passcode-submit" class="primary" type="button">Continue securely</button>
+      </div>
+    </section>
+
+    <section id="dashboard" hidden>
+      <header class="portal-header">
+        <div class="brand">
+          <div id="brand-fallback" class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3 4.5 7.2v9.6L12 21l7.5-4.2V7.2L12 3Z"/><path d="m8.2 12 2.3 2.3 5.3-5.3"/></svg>
+          </div>
+          <img id="brand-logo" class="brand-logo" alt="" hidden>
+          <div>
+            <p class="eyebrow" id="brand-name">CLIENT PORTAL</p>
+            <h1 class="title" id="client-label">Application</h1>
+          </div>
+        </div>
+        <div class="header-actions">
+          <span class="auth-pill" title="This browser is securely authenticated">
+            <span class="status-dot"></span>
+            Authenticated
+          </span>
+          <button id="refresh" class="icon-button" type="button" title="Refresh status" aria-label="Refresh status">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M6.1 9A7 7 0 0 1 18 6l2 5M17.9 15A7 7 0 0 1 6 18l-2-5"/></svg>
+          </button>
+          <button id="sign-out" class="quiet-button" type="button">Forget this device</button>
+        </div>
+      </header>
+
+      <section class="status-hero" aria-labelledby="health-heading">
+        <div>
+          <p class="eyebrow" id="health-heading">CURRENT AVAILABILITY</p>
+          <div class="health-row"><span class="health-indicator" id="health-indicator"></span><p class="health-value" id="health">—</p></div>
+          <p class="hero-copy" id="containers">Checking application components…</p>
+        </div>
+        <div class="status-meta">
+          <p id="message" role="status" aria-live="polite">Connecting…</p>
+          <p class="subtle" id="updated"></p>
+          <p class="subtle" id="session-expiry"></p>
+        </div>
+      </section>
+
+      <div class="metric-grid">
+        <article class="metric-card"><p class="metric-label">Uptime</p><p class="metric-value" id="uptime">—</p><p class="metric-note">Continuous availability</p></article>
+        <article class="metric-card"><p class="metric-label">CPU</p><p class="metric-value" id="cpu">—</p><p class="metric-note">Current utilization</p></article>
+        <article class="metric-card"><p class="metric-label">Memory</p><p class="metric-value" id="memory">—</p><p class="metric-note">Used across components</p></article>
+        <article class="metric-card"><p class="metric-label">Container storage</p><p class="metric-value metric-value-small" id="storage">—</p><p class="metric-note" id="storage-io">Named-volume capacity is not included.</p></article>
+      </div>
+
+      <div class="content-grid">
+        <article class="card"><div class="card-heading"><div><p class="eyebrow">THROUGHPUT</p><h2>Network</h2></div></div><p class="value" id="network-rate">—</p><p class="metric-note" id="network-total">—</p></article>
+        <article class="card"><div class="card-heading"><div><p class="eyebrow">COMPONENTS</p><h2>Services</h2></div></div><ul id="services" class="services"></ul></article>
+        <article class="card" id="backup-card"><div class="card-heading"><div><p class="eyebrow">DATA SAFETY</p><h2>Backups</h2></div></div><p class="value value-small" id="backup-status">Owner-managed</p><p class="metric-note" id="backup-reason">Backup status is controlled by the application owner.</p></article>
+        <article class="card" id="http-metrics-unavailable"><div class="card-heading"><div><p class="eyebrow">TRAFFIC</p><h2>HTTP requests</h2></div></div><p class="subtle" id="http-metrics-reason">HTTP request metrics are unavailable. Resource metrics continue to update.</p></article>
+
+        <article class="card full chart-card">
+          <div class="card-heading chart-heading"><div><p class="eyebrow">PERFORMANCE</p><h2>Last hour</h2></div><div class="legend"><span><i class="cpu-key"></i>CPU</span><span><i class="memory-key"></i>Memory</span></div></div>
+          <svg id="history-chart" class="chart" viewBox="0 0 600 180" role="img" aria-label="CPU and memory percentage over the last hour"><line x1="0" y1="45" x2="600" y2="45"></line><line x1="0" y1="90" x2="600" y2="90"></line><line x1="0" y1="135" x2="600" y2="135"></line><polyline id="cpu-line" class="cpu-line" points=""></polyline><polyline id="memory-line" class="memory-line" points=""></polyline></svg>
+          <details class="history-details"><summary>View recent metric samples</summary><div class="table-wrap"><table><caption>Recent metric samples</caption><thead><tr><th>Time</th><th>CPU</th><th>Memory</th><th>Network</th><th>Storage</th><th>Components</th></tr></thead><tbody id="history-rows"></tbody></table></div></details>
+        </article>
+
+        <article class="card full action-card" id="actions-card">
+          <div class="card-heading"><div><p class="eyebrow">OWNER-ENABLED</p><h2>Application controls</h2></div><span class="permission-pill">Audited actions</span></div>
+          <p class="subtle">These controls affect the whole application. Every request is recorded for the application owner.</p>
+          <div class="actions"><button class="primary" id="start" type="button" hidden>Start application</button><button id="restart" type="button" hidden>Restart application</button><button class="danger" id="suspend" type="button" hidden>Suspend application</button></div>
+        </article>
+        <article class="card full" id="logs-card" hidden><div class="card-heading"><div><p class="eyebrow">DIAGNOSTICS</p><h2>Recent application logs</h2></div><button id="show-logs" type="button">Load recent logs</button></div><pre id="logs" class="logs" aria-live="polite">Logs are loaded only when requested.</pre></article>
+      </div>
+      <footer><span id="footer-brand">Secure client portal</span><span>Access remains available until the owner revokes or expires this link.</span></footer>
     </section>
   </main>
   <script src="/portal.js" defer></script>

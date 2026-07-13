@@ -9,6 +9,42 @@ export const PERMISSIONS = Object.freeze([
   'suspend',
 ]);
 
+export const DEFAULT_BRANDING = Object.freeze({
+  name: 'Application status',
+  logoDataUrl: null,
+  primaryColor: '#2563EB',
+});
+
+const LOGO_DATA_URL = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+const MAX_LOGO_DATA_URL_LENGTH = 48 * 1024;
+
+export function validateBranding(value, fallbackName = DEFAULT_BRANDING.name) {
+  if (value == null) return { ...DEFAULT_BRANDING, name: fallbackName };
+  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid branding');
+  const allowedKeys = new Set(['name', 'logoDataUrl', 'primaryColor']);
+  if (Object.keys(value).some((key) => !allowedKeys.has(key))) throw new Error('Unknown branding field');
+
+  const name = typeof value.name === 'string' ? value.name.trim() : fallbackName;
+  if (!name || name.length > 60 || /[\0\r\n]/.test(name)) throw new Error('Invalid branding name');
+
+  const primaryColor = value.primaryColor ?? DEFAULT_BRANDING.primaryColor;
+  if (typeof primaryColor !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(primaryColor)) {
+    throw new Error('Invalid branding color');
+  }
+
+  const logoDataUrl = value.logoDataUrl ?? null;
+  if (
+    logoDataUrl !== null &&
+    (typeof logoDataUrl !== 'string' ||
+      logoDataUrl.length > MAX_LOGO_DATA_URL_LENGTH ||
+      !LOGO_DATA_URL.test(logoDataUrl))
+  ) {
+    throw new Error('Invalid branding logo');
+  }
+
+  return { name, logoDataUrl, primaryColor: primaryColor.toUpperCase() };
+}
+
 export function validateLinkPolicy(value) {
   if (!value || typeof value !== 'object') throw new Error('Policy is required');
   const requiredStrings = ['id', 'installationId', 'targetStackRef', 'expectedProjectName', 'clientLabel', 'tokenHash'];
@@ -32,5 +68,9 @@ export function validateLinkPolicy(value) {
   if (!permissions.includes('view_status') || !permissions.includes('view_metrics')) {
     throw new Error('Status and metrics permissions are required');
   }
-  return { ...value, permissions };
+  return {
+    ...value,
+    permissions,
+    branding: validateBranding(value.branding, value.clientLabel.trim()),
+  };
 }

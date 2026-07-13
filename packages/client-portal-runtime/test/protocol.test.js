@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { PROTOCOL_VERSION, SCHEMA_VERSION, validateLinkPolicy } from '../../client-portal-protocol/index.js';
+import { PROTOCOL_VERSION, SCHEMA_VERSION, validateBranding, validateLinkPolicy } from '../../client-portal-protocol/index.js';
 import { openBrokerDatabase } from '../broker/schema.js';
 import { addCounterRates, orderedPowerContainers, redactLogText, scopedContainers } from '../broker/docker.js';
 import { Readable } from 'node:stream';
@@ -16,6 +16,25 @@ test('protocol rejects unknown permissions and accepts the scoped baseline', () 
   assert.throws(() => validateLinkPolicy({ ...policy, permissions: [...policy.permissions, 'shell'] }));
   assert.throws(() => validateLinkPolicy({ ...policy, clientLabel: 'client\nforged' }));
   assert.throws(() => validateLinkPolicy({ ...policy, passcodeHash: 'scrypt$v1$bad$bad' }));
+});
+
+test('portal branding accepts safe raster logos and rejects scriptable or oversized assets', () => {
+  const safeLogo = `data:image/png;base64,${Buffer.from('small-png').toString('base64')}`;
+  assert.deepEqual(validateBranding({ name: 'Acme', logoDataUrl: safeLogo, primaryColor: '#1d4ed8' }), {
+    name: 'Acme',
+    logoDataUrl: safeLogo,
+    primaryColor: '#1D4ED8',
+  });
+  // Missing branding falls back to the client label with safe defaults.
+  assert.deepEqual(validateBranding(null, 'Client'), { name: 'Client', logoDataUrl: null, primaryColor: '#2563EB' });
+  // SVG (scriptable), oversized, and malformed color are all rejected.
+  assert.throws(() => validateBranding({ name: 'Acme', logoDataUrl: 'data:image/svg+xml;base64,PHN2Zz4=', primaryColor: '#1D4ED8' }));
+  assert.throws(() => validateBranding({ name: 'Acme', logoDataUrl: `data:image/png;base64,${'A'.repeat(49 * 1024)}`, primaryColor: '#1D4ED8' }));
+  assert.throws(() => validateBranding({ name: 'Acme', logoDataUrl: null, primaryColor: 'blue' }));
+  // Branding rides along on the validated link policy.
+  const policy = { id: 'link', installationId: 'install', targetStackRef: 'stack', expectedProjectName: 'project', clientLabel: 'Client', tokenHash: 'a'.repeat(64), tokenVersion: 1, expiresAt: Date.now() + 1000, permissions: ['view_status', 'view_metrics'] };
+  assert.equal(validateLinkPolicy(policy).branding.name, 'Client');
+  assert.equal(validateLinkPolicy({ ...policy, branding: { name: 'Acme', primaryColor: '#10b981' } }).branding.primaryColor, '#10B981');
 });
 
 test('HTTP helpers cap JSON bodies and ignore malformed cookies', async () => {
@@ -36,6 +55,7 @@ test('broker schema persists operation, link, session, audit, metrics, and rate-
   assert.equal(db.prepare("SELECT value FROM runtime_metadata WHERE key='schema_version'").get().value, '3');
   assert.deepEqual(['storage_bytes', 'block_read_bytes', 'block_write_bytes'].every((name) => db.prepare('PRAGMA table_info(resource_points_1m)').all().some((column) => column.name === name)), true);
   assert.equal(db.prepare('PRAGMA table_info(action_operations)').all().some((column) => column.name === 'action_kind'), true);
+  assert.equal(db.prepare('PRAGMA table_info(links)').all().some((column) => column.name === 'branding'), true);
   db.close();
 });
 

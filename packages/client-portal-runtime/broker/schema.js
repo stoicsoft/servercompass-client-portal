@@ -34,6 +34,7 @@ export function openBrokerDatabase(filename) {
       token_version INTEGER NOT NULL,
       passcode_hash TEXT,
       permissions TEXT NOT NULL,
+      branding TEXT NOT NULL DEFAULT '{}',
       expires_at INTEGER NOT NULL,
       revoked_at INTEGER,
       revision INTEGER NOT NULL,
@@ -141,6 +142,9 @@ export function openBrokerDatabase(filename) {
   const linkColumns = db.prepare('PRAGMA table_info(links)').all();
   if (!linkColumns.some((column) => column.name === 'target_project_name')) {
     db.exec("ALTER TABLE links ADD COLUMN target_project_name TEXT NOT NULL DEFAULT '';");
+  }
+  if (!linkColumns.some((column) => column.name === 'branding')) {
+    db.exec("ALTER TABLE links ADD COLUMN branding TEXT NOT NULL DEFAULT '{}';");
   }
   for (const table of ['resource_points_1m', 'resource_points_5m']) {
     const columns = db.prepare(`PRAGMA table_info(${table})`).all();

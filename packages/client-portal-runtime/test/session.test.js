@@ -160,6 +160,7 @@ function fakeNode() {
     append() {},
     replaceChildren() {},
     setAttribute(name, value) { this.attributes[name] = value; },
+    removeAttribute(name) { delete this.attributes[name]; },
   };
 }
 

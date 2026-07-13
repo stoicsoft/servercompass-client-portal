@@ -235,7 +235,17 @@ async function runStackAction(request, response, auth, action) {
     const outcomes = await stackActions[action].execute(auth.link.target_stack_ref, auth.link.target_project_name);
     const outcome = outcomes.every((item) => item.success) ? 'succeeded' : 'failed';
     const statusCode = outcome === 'succeeded' ? 200 : 207;
-    const body = { action, operationId: idempotencyKey, outcomes };
+    // Refresh the cached snapshot immediately so the portal reflects the new
+    // power state on its next read instead of waiting for the 60s collector.
+    let snapshotRefreshed = false;
+    try {
+      await collectStack(auth.link.target_stack_ref, auth.link.target_project_name);
+      snapshotRefreshed = true;
+    } catch {
+      // The lifecycle result stays authoritative; the collector already records
+      // any named cache failure and the browser can retry its status refresh.
+    }
+    const body = { action, operationId: idempotencyKey, outcomes, snapshotRefreshed };
     audit(auth.link.id, `${action}_outcome`, outcome, { operationId: idempotencyKey, succeeded: outcomes.filter((item) => item.success).length, failed: outcomes.filter((item) => !item.success).length }, request);
     db.prepare("UPDATE action_operations SET state='completed',status_code=?,result_json=?,updated_at=? WHERE link_id=? AND idempotency_key=?")
       .run(statusCode, JSON.stringify(body), Date.now(), auth.link.id, idempotencyKey);
@@ -277,10 +287,10 @@ async function admin(request, response, url) {
     // policy can become remotely active.
     await collectStack(policy.targetStackRef, policy.expectedProjectName);
     db.transaction(() => {
-      db.prepare(`INSERT INTO links (id, installation_id, target_stack_ref, target_project_name, client_label, token_hash, token_version, passcode_hash, permissions, expires_at, revoked_at, revision, created_at, updated_at)
-        VALUES (@id, @installationId, @targetStackRef, @expectedProjectName, @clientLabel, @tokenHash, @tokenVersion, @passcodeHash, @permissions, @expiresAt, NULL, @revision, @createdAt, @updatedAt)
-        ON CONFLICT(id) DO UPDATE SET target_project_name=excluded.target_project_name,client_label=excluded.client_label, token_hash=excluded.token_hash, token_version=excluded.token_version, passcode_hash=excluded.passcode_hash, permissions=excluded.permissions, expires_at=excluded.expires_at, revoked_at=NULL, revision=excluded.revision, updated_at=excluded.updated_at`)
-        .run({ ...policy, passcodeHash: policy.passcodeHash ?? null, permissions: JSON.stringify(policy.permissions), revision, createdAt: existing?.created_at ?? now, updatedAt: now });
+      db.prepare(`INSERT INTO links (id, installation_id, target_stack_ref, target_project_name, client_label, token_hash, token_version, passcode_hash, permissions, branding, expires_at, revoked_at, revision, created_at, updated_at)
+        VALUES (@id, @installationId, @targetStackRef, @expectedProjectName, @clientLabel, @tokenHash, @tokenVersion, @passcodeHash, @permissions, @brandingJson, @expiresAt, NULL, @revision, @createdAt, @updatedAt)
+        ON CONFLICT(id) DO UPDATE SET target_project_name=excluded.target_project_name,client_label=excluded.client_label, token_hash=excluded.token_hash, token_version=excluded.token_version, passcode_hash=excluded.passcode_hash, permissions=excluded.permissions, branding=excluded.branding, expires_at=excluded.expires_at, revoked_at=NULL, revision=excluded.revision, updated_at=excluded.updated_at`)
+        .run({ ...policy, passcodeHash: policy.passcodeHash ?? null, permissions: JSON.stringify(policy.permissions), brandingJson: JSON.stringify(policy.branding), revision, createdAt: existing?.created_at ?? now, updatedAt: now });
       db.prepare('INSERT INTO link_revisions (link_id, revision, policy_json, created_at) VALUES (?, ?, ?, ?)').run(policy.id, revision, JSON.stringify({ ...policy, tokenHash: '[REDACTED]', passcodeHash: policy.passcodeHash ? '[REDACTED]' : null }), now);
       db.prepare('INSERT INTO applied_operations (operation_id, kind, result_json, applied_at) VALUES (?, ?, ?, ?)').run(body.operationId, 'apply_link', JSON.stringify(result), now);
     })();
@@ -370,7 +380,10 @@ async function publicApi(request, response, url) {
     if (link.passcode_hash && !(await verifyPasscode(body.passcode ?? '', link.passcode_hash))) return genericAuthError(response);
     const sessionId = randomBytes(32).toString('base64url');
     const csrf = randomBytes(24).toString('base64url');
-    const expiresAt = Math.min(link.expires_at, Date.now() + 12 * 60 * 60 * 1000);
+    // Persist the browser session for the full life of the link so returning
+    // clients simply reopen the base URL — no need to re-open the private link
+    // until the owner revokes or expires it.
+    const expiresAt = link.expires_at;
     db.prepare('INSERT INTO sessions (id_hash, link_id, token_version, csrf_hash, permission_ceiling, expires_at, revoked_at) VALUES (?, ?, ?, ?, NULL, ?, NULL)')
       .run(sha256(sessionId), link.id, link.token_version, sha256(csrf), expiresAt);
     audit(link.id, 'session_exchange', 'allowed', {}, request);
@@ -418,6 +431,18 @@ async function publicApi(request, response, url) {
       expiresAt: Math.min(auth.session.session_expires_at, auth.link.expires_at),
     });
   }
+  if (url.pathname === '/api/session/logout' && request.method === 'POST') {
+    // "Forget this device": revoke the current browser session and clear the
+    // cookie. Always succeed so the browser UI can drop its state either way.
+    const auth = sessionFor(request);
+    if (auth) {
+      db.prepare('UPDATE sessions SET revoked_at=? WHERE id_hash=?').run(Date.now(), auth.session.id_hash);
+      audit(auth.link.id, 'session_logout', 'succeeded', {}, request);
+    }
+    return json(response, 200, { authenticated: false }, {
+      'set-cookie': '__Host-scp_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0',
+    });
+  }
   if (url.pathname === '/api/dashboard' && request.method === 'GET') {
     const auth = requirePermission(request, response, 'view_status');
     if (!auth) return;
@@ -439,6 +464,7 @@ async function publicApi(request, response, url) {
     audit(auth.link.id, 'dashboard_view', 'allowed', { stale }, request);
     return json(response, 200, {
       clientLabel: auth.link.client_label,
+      branding: JSON.parse(auth.link.branding || '{}'),
       permissions: JSON.parse(auth.link.permissions),
       expiresAt: auth.link.expires_at,
       snapshot,

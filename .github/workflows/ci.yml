@@ -20,4 +20,7 @@ jobs:
           cache-dependency-path: packages/client-portal-runtime/package-lock.json
       - run: npm ci --prefix packages/client-portal-runtime
       - run: npm test
-
+      - name: Build broker smoke image
+        run: docker build --file packages/client-portal-runtime/broker/Dockerfile --tag servercompass-client-portal-broker:smoke packages
+      - name: Smoke-check broker startup
+        run: bash scripts/smoke-broker-image.sh servercompass-client-portal-broker:smoke

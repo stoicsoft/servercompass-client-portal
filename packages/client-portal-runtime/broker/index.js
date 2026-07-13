@@ -116,9 +116,12 @@ function activeLinkByCapability(capability) {
 function sessionFor(request) {
   const raw = cookies(request)['__Host-scp_session'];
   if (!raw) return null;
-  const [sessionId, signature] = raw.split('.');
+  const parts = raw.split('.');
+  if (parts.length !== 2) return null;
+  const [sessionId, signature] = parts;
+  if (!/^[A-Za-z0-9_-]{43}$/.test(sessionId) || !/^[a-f0-9]{64}$/.test(signature)) return null;
   const expected = sessionSignature(sessionId);
-  if (!signature || !safeEqual(signature, expected)) return null;
+  if (!safeEqual(signature, expected)) return null;
   const row = db.prepare(`SELECT id_hash, link_id, token_version AS session_token_version, csrf_hash, permission_ceiling, expires_at AS session_expires_at, revoked_at AS session_revoked_at FROM sessions WHERE id_hash = ?`).get(sha256(sessionId));
   if (!row || row.session_revoked_at || row.session_expires_at <= Date.now()) return null;
   const current = db.prepare('SELECT * FROM links WHERE id = ?').get(row.link_id);
@@ -396,6 +399,23 @@ async function publicApi(request, response, url) {
     audit(link.id, 'owner_preview', 'allowed', {}, request);
     return json(response, 200, { authenticated: true, csrf, expiresAt }, {
       'set-cookie': `__Host-scp_session=${sessionId}.${sessionSignature(sessionId)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=300`,
+    });
+  }
+  if (url.pathname === '/api/session/restore' && request.method === 'POST') {
+    const auth = sessionFor(request);
+    if (!auth) return genericAuthError(response);
+    if (rateLimit(`restore:${auth.session.id_hash}`, 30, 60_000)) {
+      return json(response, 429, { error: 'Try again later' }, { 'retry-after': '60' });
+    }
+    const csrf = randomBytes(24).toString('base64url');
+    const update = db.prepare('UPDATE sessions SET csrf_hash=? WHERE id_hash=? AND revoked_at IS NULL AND expires_at>?')
+      .run(sha256(csrf), auth.session.id_hash, Date.now());
+    if (update.changes !== 1) return genericAuthError(response);
+    audit(auth.link.id, 'session_restore', 'allowed', {}, request);
+    return json(response, 200, {
+      authenticated: true,
+      csrf,
+      expiresAt: Math.min(auth.session.session_expires_at, auth.link.expires_at),
     });
   }
   if (url.pathname === '/api/dashboard' && request.method === 'GET') {

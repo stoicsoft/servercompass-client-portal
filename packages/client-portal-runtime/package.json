@@ -9,6 +9,6 @@
   },
   "dependencies": {
     "@servercompass/client-portal-protocol": "file:../client-portal-protocol",
-    "better-sqlite3": "^12.4.1"
+    "better-sqlite3": "^13.0.1"
   }
 }

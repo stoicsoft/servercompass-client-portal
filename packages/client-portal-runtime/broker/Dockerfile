@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS dependencies
+FROM node:25-bookworm-slim AS dependencies
 WORKDIR /app
 COPY client-portal-protocol /client-portal-protocol
 COPY client-portal-runtime/package.json client-portal-runtime/package-lock.json ./
@@ -7,7 +7,7 @@ RUN apt-get update \
     && npm ci --omit=dev --ignore-scripts=false \
     && rm -rf /var/lib/apt/lists/* /root/.npm
 
-FROM node:22-bookworm-slim
+FROM node:25-bookworm-slim
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /client-portal-protocol /client-portal-protocol
